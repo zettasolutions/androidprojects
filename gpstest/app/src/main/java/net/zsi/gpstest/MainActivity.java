@@ -29,11 +29,10 @@ import java.util.List;
 
 
 public class MainActivity extends AppCompatActivity {
-    private static final int DEFAULT_UPDATE_INTERVAL = 5;
+    private static final int DEFAULT_UPDATE_INTERVAL = 3;
     public static final int FAST_UPDATE_INTERVAL = 5;
     private static final int PERMISSIONS_FINE_LOCATION = 99;
     private static final String TAG = "MainActivity";
-    int ctr =0,ctr2 =0;
     float distance=0;
     Location lastLocation;
 
@@ -119,8 +118,6 @@ public class MainActivity extends AppCompatActivity {
         });
 
 
-
-
     }// end onCreate method
 
     private void stopLocationUpdates() {
@@ -165,10 +162,6 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void updateGPS(){
-        ctr2 +=1;
-        Log.d(TAG,"updateGPS, ctr:" + ctr2);
-
-
         fusedLocationProviderClient = LocationServices.getFusedLocationProviderClient(MainActivity.this);
         if(
                 ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
@@ -195,12 +188,11 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void updateUIValues(Location location) {
-
-        if(lastLocation != null) {
-            if(location.getSpeed() > 0) distance += lastLocation.distanceTo(location);
+        float _tmpDistance=0;
+        if(lastLocation != null){
+            _tmpDistance = lastLocation.distanceTo(location);
+            if(_tmpDistance > 1 ) distance += _tmpDistance;
         }
-
-        Log.d(TAG,"Latitude:" + location.getLatitude() + ", Longitude:" + location.getLongitude() + ", distance(m):" +  distance);
 
         tv_lat.setText(String.valueOf(location.getLatitude()) );
         tv_lon.setText(String.valueOf(location.getLongitude()) );
