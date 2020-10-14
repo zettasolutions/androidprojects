@@ -7,14 +7,10 @@ import android.content.pm.PackageManager;
 import android.location.Address;
 import android.location.Geocoder;
 import android.location.Location;
-import android.os.Build;
 import android.os.IBinder;
 import android.util.Log;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
-import androidx.appcompat.app.AppCompatActivity;
-import androidx.core.app.ActivityCompat;
-import androidx.core.content.ContextCompat;
 
 import com.google.android.gms.location.FusedLocationProviderClient;
 import com.google.android.gms.location.LocationCallback;
@@ -41,7 +37,6 @@ public class GPSService extends Service {
 
     @Override
     public void onCreate() {
-        Log.d(TAG, "onCreate: begin");
         locationRequest = new LocationRequest();
         locationRequest.setInterval(1000 * 3);
         locationRequest.setFastestInterval(1000 * 5);
@@ -71,7 +66,6 @@ public class GPSService extends Service {
             }).addOnFailureListener(new OnFailureListener() {
                 @Override
                 public void onFailure(@NonNull Exception e) {
-                    Log.d(TAG, "addOnSuccessListener.onFailure: ");
                     Log.d(TAG, "Error trying to get last GPS location");
                     e.printStackTrace();
                 }
@@ -124,15 +118,4 @@ public class GPSService extends Service {
         }
 
     }
-    private boolean isGranted(int permission) {
-        return permission == PackageManager.PERMISSION_GRANTED;
-    }
-    private boolean checkPermission() {
-        return isGranted(ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION))
-                 && isGranted(ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION))
-                ;
-
-    }
-
-
-}
+ }

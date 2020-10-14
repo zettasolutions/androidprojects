@@ -1,8 +1,6 @@
 package net.zsi.gpstest;
 
-import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
-import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 
 import android.Manifest;
@@ -11,38 +9,25 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.pm.PackageManager;
-import android.location.Address;
-import android.location.Geocoder;
 import android.location.Location;
-import android.location.LocationManager;
 import android.os.Build;
 import android.os.Bundle;
-import android.provider.Settings;
 import android.util.Log;
 import android.view.View;
 import android.widget.Button;
-import android.widget.Switch;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import com.google.android.gms.location.FusedLocationProviderClient;
-import com.google.android.gms.location.LocationCallback;
-import com.google.android.gms.location.LocationRequest;
-import com.google.android.gms.location.LocationResult;
-import com.google.android.gms.location.LocationServices;
-import com.google.android.gms.tasks.OnSuccessListener;
-
-import java.io.Serializable;
-import java.util.List;
-
 public class MainActivity extends AppCompatActivity {
     private static final String TAG = "MainActivity";
-    TextView tv_lat, tv_lon, tv_altitude,tv_accuracy, tv_speed,tv_distance,tv_address;
-    Button btn_start,btn_stop,btn_distance;
+    private static final int TOAST_DURATION = 0;
+    private TextView tv_lat, tv_lon, tv_altitude,tv_accuracy, tv_speed,tv_distance,tv_address;
+    private Button btn_start,btn_stop,btn_distance;
 
     private BroadcastReceiver broadcastReceiver;
-    Location lastLocation;
-    float distance=0;
+    private Location lastLocation;
+    private float distance=0;
+    private Context cxt;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -64,8 +49,7 @@ public class MainActivity extends AppCompatActivity {
         if (!runtime_permissions()) {
             setButtonClickEvents();
         }
-
-        Log.d(TAG, "onCreate: onCreate-end");
+        cxt=getApplicationContext();
 
     }// end onCreate method
     public void onResume() {
@@ -86,8 +70,9 @@ public class MainActivity extends AppCompatActivity {
         btn_start.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                Log.d(TAG, "onClick: btn_start-agi");
                 MainActivity.this.startService(new Intent(MainActivity.this.getApplicationContext(), GPSService.class));
+                Toast.makeText(cxt, "Service is started.", TOAST_DURATION).show();
+
             }
         });
 
@@ -102,6 +87,9 @@ public class MainActivity extends AppCompatActivity {
                 tv_speed.setText("0.00" );
                 tv_address.setText("");
                 MainActivity.this.stopService(new Intent(MainActivity.this.getApplicationContext(), GPSService.class));
+
+                 Toast.makeText(cxt, "Service is stop.", TOAST_DURATION).show();
+
             }
         });
 
@@ -109,6 +97,7 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onClick(View v) {
                 distance=0;
+                Toast.makeText(cxt, "Distance is now zero(0).", TOAST_DURATION).show();
             }
         });
 
