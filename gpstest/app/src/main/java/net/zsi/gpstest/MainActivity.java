@@ -3,14 +3,21 @@ package net.zsi.gpstest;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
+import androidx.core.content.ContextCompat;
 
 import android.Manifest;
+import android.content.BroadcastReceiver;
+import android.content.Context;
+import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.pm.PackageManager;
 import android.location.Address;
 import android.location.Geocoder;
 import android.location.Location;
+import android.location.LocationManager;
 import android.os.Build;
 import android.os.Bundle;
+import android.provider.Settings;
 import android.util.Log;
 import android.view.View;
 import android.widget.Button;
@@ -25,26 +32,17 @@ import com.google.android.gms.location.LocationResult;
 import com.google.android.gms.location.LocationServices;
 import com.google.android.gms.tasks.OnSuccessListener;
 
+import java.io.Serializable;
 import java.util.List;
 
-
 public class MainActivity extends AppCompatActivity {
-    private static final int DEFAULT_UPDATE_INTERVAL = 3;
-    public static final int FAST_UPDATE_INTERVAL = 5;
-    private static final int PERMISSIONS_FINE_LOCATION = 99;
     private static final String TAG = "MainActivity";
-    float distance=0;
+    TextView tv_lat, tv_lon, tv_altitude,tv_accuracy, tv_speed,tv_distance,tv_address;
+    Button btn_start,btn_stop,btn_distance;
+
+    private BroadcastReceiver broadcastReceiver;
     Location lastLocation;
-
-    TextView tv_lat, tv_lon, tv_altitude,tv_accuracy, tv_speed,tv_distance, tv_sensor,tv_updates,tv_address;
-    Button btn_distance;
-
-    Switch sw_locationupdates,sw_gps;
-    boolean updateOn = false;
-
-    LocationRequest locationRequest;
-    LocationCallback locationCallBack;
-    FusedLocationProviderClient fusedLocationProviderClient;
+    float distance=0;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -57,20 +55,55 @@ public class MainActivity extends AppCompatActivity {
         tv_accuracy = findViewById(R.id.tv_accuracy);
         tv_speed = findViewById(R.id.tv_speed);
         tv_distance = findViewById(R.id.tv_distance);
-
-        tv_sensor = findViewById(R.id.tv_sensor);
-        tv_updates = findViewById(R.id.tv_updates);
         tv_address = findViewById(R.id.tv_address);
 
-        sw_locationupdates = findViewById(R.id.sw_locationsupdates);
-        sw_gps = findViewById(R.id.sw_gps);
+        btn_start = findViewById(R.id.btn_start);
+        btn_stop = findViewById(R.id.btn_stop);
         btn_distance = findViewById(R.id.btn_distance);
 
-        locationRequest = new LocationRequest();
-        locationRequest.setInterval(1000 * DEFAULT_UPDATE_INTERVAL);
-        locationRequest.setFastestInterval(1000 * FAST_UPDATE_INTERVAL);
-        locationRequest.setPriority(locationRequest.PRIORITY_BALANCED_POWER_ACCURACY);
+        if (!runtime_permissions()) {
+            setButtonClickEvents();
+        }
 
+        Log.d(TAG, "onCreate: onCreate-end");
+
+    }// end onCreate method
+    public void onResume() {
+        super.onResume();
+        if (this.broadcastReceiver == null) {
+            this.broadcastReceiver = new BroadcastReceiver() {
+                public void onReceive(Context context, Intent intent) {
+                    updateUIValues(intent);
+               }
+            };
+        }
+        System.out.println("registerReceiver");
+        registerReceiver(this.broadcastReceiver, new IntentFilter("location-update"));
+    }
+
+
+    private void setButtonClickEvents() {
+        btn_start.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                Log.d(TAG, "onClick: btn_start-agi");
+                MainActivity.this.startService(new Intent(MainActivity.this.getApplicationContext(), GPSService.class));
+            }
+        });
+
+        btn_stop.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                tv_lat.setText( "0.00");
+                tv_lon.setText("0.00");
+                tv_accuracy.setText("0.00" );
+                tv_distance.setText("0.00" );
+                tv_altitude.setText("0.00" );
+                tv_speed.setText("0.00" );
+                tv_address.setText("");
+                MainActivity.this.stopService(new Intent(MainActivity.this.getApplicationContext(), GPSService.class));
+            }
+        });
 
         btn_distance.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -79,150 +112,65 @@ public class MainActivity extends AppCompatActivity {
             }
         });
 
-        locationCallBack = new LocationCallback(){
-            @Override
-            public void onLocationResult(LocationResult locationResult) {
-
-                super.onLocationResult(locationResult);
-                updateUIValues(locationResult.getLastLocation());
-            }
-        };
-
-        sw_gps.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                if(sw_gps.isChecked()){
-                    locationRequest.setPriority(LocationRequest.PRIORITY_HIGH_ACCURACY);
-                    tv_sensor.setText("Using GPS sensors");
-                }else{
-                    locationRequest.setPriority(LocationRequest.PRIORITY_BALANCED_POWER_ACCURACY);
-                    tv_sensor.setText("Using Towers + WIFI");
-                }
-            }
-        });
-
-        sw_locationupdates.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                if(sw_locationupdates.isChecked()){
-                    updateGPS();
-                    startLocationUpdates();
-
-                }else{
-
-                    stopLocationUpdates();
-                }
-
-
-            }
-        });
-
-
-    }// end onCreate method
-
-    private void stopLocationUpdates() {
-        tv_updates.setText("Location is NOT being tracked");
-        tv_lat.setText("Not tracking location");
-        tv_lon.setText("Not tracking location");
-        tv_speed.setText("Not tracking location");
-        tv_distance.setText("Not tracking location");
-        tv_address.setText("Not tracking location");
-        tv_accuracy.setText("Not tracking location");
-        tv_altitude.setText("Not tracking location");
-        tv_sensor.setText("Not tracking location");
-
-        fusedLocationProviderClient.removeLocationUpdates(locationCallBack);
-    }
-
-    private void startLocationUpdates() {
-        tv_updates.setText("Location is being tracked");
-        fusedLocationProviderClient.requestLocationUpdates(locationRequest,locationCallBack,null);
-        updateGPS();
-    }
-
-
-
-    @Override
-    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
-        Log.d(TAG,"onRequestPermissionsResult, requestCode:" + requestCode);
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
-        switch (requestCode){
-            case PERMISSIONS_FINE_LOCATION:
-                if(grantResults[0] == PackageManager.PERMISSION_GRANTED){
-
-                    updateGPS();
-                }else{
-
-                    Toast.makeText(this,"This app requires permission to be granted in order to work properly",Toast.LENGTH_LONG).show();
-                    finish();
-                }
-                break;
-
-        }
-    }
-
-    private void updateGPS(){
-        fusedLocationProviderClient = LocationServices.getFusedLocationProviderClient(MainActivity.this);
-        if(
-                ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
-                   //     && ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
-        ){
-            fusedLocationProviderClient.getLastLocation().addOnSuccessListener(this, new OnSuccessListener<Location>() {
-                @Override
-                public void onSuccess(Location location) {
-                    Log.d(TAG,"updateGPS.onSuccess");
-                    updateUIValues(location);
-                }
-            });
-
-        }
-        else{
-            if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.M){
-                requestPermissions(new String[]{Manifest.permission.ACCESS_FINE_LOCATION},PERMISSIONS_FINE_LOCATION);
-            }
-
-
-        }
 
 
     }
-
-    private void updateUIValues(Location location) {
+    private void updateUIValues(Intent intent) {
         float _tmpDistance=0;
+        String  lat = intent.getExtras().get("lat").toString();
+        String  lng = intent.getExtras().get("lng").toString();
+
+        Location newLocation  = new Location("NL");
+        newLocation.setLatitude(  Float.parseFloat(lat) );
+        newLocation.setLongitude(Float.parseFloat(lng) );
+
         if(lastLocation != null){
-            _tmpDistance = lastLocation.distanceTo(location);
+            _tmpDistance = lastLocation.distanceTo(newLocation);
             if(_tmpDistance > 1 ) distance += _tmpDistance;
         }
 
-        tv_lat.setText(String.valueOf(location.getLatitude()) );
-        tv_lon.setText(String.valueOf(location.getLongitude()) );
-        tv_accuracy.setText(String.valueOf(location.getAccuracy()) );
-        tv_distance.setText(String.valueOf(distance) );
+        String  accuracy = intent.getExtras().get("accuracy").toString();
+        String  altitude = intent.getExtras().get("altitude").toString();
+        String  speed = intent.getExtras().get("speed").toString();
+        String  address = intent.getExtras().get("address").toString();
+        tv_lat.setText( lat);
+        tv_lon.setText(lng);
+        tv_accuracy.setText(accuracy );
+        tv_distance.setText(distance  + "");
+        tv_altitude.setText(altitude );
+        tv_speed.setText(speed );
+        tv_address.setText(address);
 
-        if(location.hasAltitude()){
-            tv_altitude.setText(String.valueOf(location.getAltitude()) );
-        }else{
-            tv_altitude.setText("Not available");
-        }
-
-        if(location.hasSpeed()){
-            tv_speed.setText(String.valueOf(location.getSpeed()) );
-        }else{
-            tv_speed.setText("Not available");
-        }
-        Geocoder geocoder = new Geocoder(MainActivity.this);
-        try{
-            List<Address> addresses =  geocoder.getFromLocation(location.getLatitude(),location.getLongitude(),1);
-            tv_address.setText(addresses.get(0).getAddressLine(0));
-
-        }
-        catch (Exception e){
-            tv_address.setText("Unable to get street address");
-        }
-
-        lastLocation=location;
+        //set last location
+        lastLocation  = new Location("LL");
+        lastLocation.setLatitude( Float.parseFloat(lat) );
+        lastLocation.setLongitude(Float.parseFloat(lng) );
 
     }
 
 
+    private boolean runtime_permissions() {
+        if (Build.VERSION.SDK_INT >= 23 && ContextCompat.checkSelfPermission(this,Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+             requestPermissions(new String[]{Manifest.permission.ACCESS_FINE_LOCATION}, 100);
+            return true;
+        }
+        return false;
+    }
+
+    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode != 100) {
+            return;
+        }
+        if (grantResults[0] == 0 && grantResults[1] == 0) {
+            setButtonClickEvents();
+        } else {
+            runtime_permissions();
+        }
+    }
+
+    public void onDestroy() {
+        super.onDestroy();
+        this.unregisterReceiver(this.broadcastReceiver);
+    }
 }
